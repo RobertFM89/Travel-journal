@@ -6,7 +6,7 @@ const createTables = async () => {
         const pool = await getPool()
 
         await pool.query(`DROP TABLE IF EXISTS 
-        post_tags, tags, users, posts, votes, roles, post_media, comments`)
+        tags, posts_tags, users, posts, votes, roles, post_media, comments`)
         console.log('Removing tables...')
 
         await pool.query(`CREATE TABLE users 

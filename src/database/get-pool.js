@@ -21,7 +21,8 @@ const getPool = async () => {
                 port : DB_PORT,
                 database : DB_DATABASE
             });
-            return pool;
+            console.log("Established connection")
+            return pool
         }
        
 
