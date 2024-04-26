@@ -49,7 +49,7 @@ app.post('/sign-up', async (req, res, next) => {
 
     } catch (error) {
         console.log(error)
-        next("El error esta en el /sign-up " + error.message)
+        next("El error esta en el POST /sign-up " + error.message)
     }
 })
 
@@ -101,7 +101,7 @@ app.post('/sign-in', async (req, res, next) => {
         
     } catch (error) {
         console.log(error);
-        next("El error esta en el /sign-in " + error.message)
+        next("El error esta en el POST /sign-in " + error.message)
         
     }
 }) 
@@ -118,7 +118,42 @@ app.get('/posts', async (req, res, next) => {
 
     } catch (error) {
         console.log(error)
-        next(" Error en el get /posts " + error.message)
+        next(" Error en el GET /posts " + error.message)
+    }
+})
+
+//crear publicacion
+app.post('/posts', async(req, res, next) => {
+    try {
+        const token = req.headers.authorization;
+        const currentUser = jwt.verify(token, JWT_SECRET)
+
+        console.log(currentUser)
+
+        const {title, description} = req.body;
+
+        //validar los datos
+        if([title, description].includes("" || undefined)){
+            let error = new Error("All fields are required");
+            error.status = 400;
+            throw error;
+        }
+
+        const [post] = await pool.query(`INSERT INTO posts(title, description, userId) 
+        VALUES (?, ?, ?)`,[title, description, currentUser.id])
+
+        return res.status(201).json({
+            ok: true,
+            message: "Publicacion creada con exito",
+            post : {
+                id : post.insertId
+            }
+        })
+
+
+    } catch (error) {
+        console.log(error)
+        next("El error esta en el POST /posts")
     }
 })
 
