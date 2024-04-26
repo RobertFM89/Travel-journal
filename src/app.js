@@ -3,6 +3,9 @@ import getPool from './database/get-pool.js';
 import { compare, hash } from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../env.js';
+import parseToken from './middlewares/parse-token.js';
+import checkUser from './middlewares/check-user.js';
+import validateCreatePost from './validations/validate-create-post.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000
@@ -10,6 +13,8 @@ const PORT = process.env.PORT || 3000
 const pool = await getPool();
 
 app.use(express.json());
+
+app.use(parseToken);
 
 //registrar a un usuario anonimo
 app.post('/sign-up', async (req, res, next) => {
@@ -123,21 +128,12 @@ app.get('/posts', async (req, res, next) => {
 })
 
 //crear publicacion
-app.post('/posts', async(req, res, next) => {
+app.post('/posts',checkUser, async(req, res, next) => {
     try {
-        const token = req.headers.authorization;
-        const currentUser = jwt.verify(token, JWT_SECRET)
-
-        console.log(currentUser)
-
-        const {title, description} = req.body;
+        const currentUser = req.currentUser;
 
         //validar los datos
-        if([title, description].includes("" || undefined)){
-            let error = new Error("All fields are required");
-            error.status = 400;
-            throw error;
-        }
+        const {title, description} = validateCreatePost(req.body)
 
         const [post] = await pool.query(`INSERT INTO posts(title, description, userId) 
         VALUES (?, ?, ?)`,[title, description, currentUser.id])
