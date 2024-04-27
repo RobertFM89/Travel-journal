@@ -8,6 +8,8 @@ import checkUser from './middlewares/check-user.js';
 import validateCreatePost from './validations/validate-create-post.js';
 import verifyOwner from './validations/verify-owner.js';
 import verifyPost from './validations/verify-post.js';
+import validateCreateComment from './validations/validate-create-comment.js';
+
 
 const app = express();
 const PORT = process.env.PORT || 3000
@@ -144,7 +146,7 @@ app.get('/posts/:idPost', async(req, res, next) => {
     }
 })
 
-//crear publicacion
+//crear publicacion 
 app.post('/posts',checkUser, async(req, res, next) => {
     try {
         const currentUser = req.currentUser;
@@ -232,6 +234,29 @@ app.delete('/posts/:idPost', checkUser, async(req, res, next) => {
     }
 })
 
+//agregar un comentario
+app.post('/posts/:idPost/comments', checkUser, async (req, res, next) => {
+    try {
+        const post = await verifyPost(req.params.idPost)
+        const currentUser = req.currentUser;
+        const {message} = validateCreateComment(req.body)
+
+        const [comment] = await pool.query(`INSERT INTO comments(message, postId, userId)
+        VALUES(?,?,?)`, [message, post.id, currentUser.id])
+
+        return res.status(201).json({
+            ok: true,
+            message:  "Comment added succesfully",
+            comment: {
+                id: comment.insertId
+            }
+        })
+
+    } catch (error) {
+        console.log(error)
+        next(error.message)
+    }
+})
 
 app.use((error, req, res, next) => {
 
