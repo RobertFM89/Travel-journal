@@ -22,9 +22,9 @@ const getPool = async () => {
                 database : DB_DATABASE
             });
             console.log("Established connection")
-            return pool
+            
         }
-       
+        return pool
 
     } catch (error) {
         console.log(error)

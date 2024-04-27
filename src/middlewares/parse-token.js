@@ -9,7 +9,7 @@ export default function parseToken(req, res, next) {
         req.currentUser = currentUser;
         
     } catch (error) {
-        console.log("Error parse-token " + error.message)
+        //console.log("Error parse-token " + error.message)
     }
     finally {
         next()

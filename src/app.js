@@ -6,6 +6,8 @@ import { JWT_SECRET } from '../env.js';
 import parseToken from './middlewares/parse-token.js';
 import checkUser from './middlewares/check-user.js';
 import validateCreatePost from './validations/validate-create-post.js';
+import verifyOwner from './validations/verify-owner.js';
+import verifyPost from './validations/verify-post.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000
@@ -127,6 +129,21 @@ app.get('/posts', async (req, res, next) => {
     }
 })
 
+//traer una publicacion
+app.get('/posts/:idPost', async(req, res, next) => {
+    try {
+        const post = await verifyPost(req.params.idPost)
+
+        return res.status(200).json({
+            ok: true,
+            post
+        })
+    } catch (error) {
+        console.log(error);
+        next(error);
+    }
+})
+
 //crear publicacion
 app.post('/posts',checkUser, async(req, res, next) => {
     try {
@@ -149,9 +166,72 @@ app.post('/posts',checkUser, async(req, res, next) => {
 
     } catch (error) {
         console.log(error)
-        next("El error esta en el POST /posts")
+        next("El error esta en el POST /posts" + error.message)
     }
 })
+
+//actualizar una publicacion
+app.patch('/posts/:idPost', checkUser, async(req, res, next) => {
+    try {
+
+        const currentUser = req.currentUser
+        const post = await verifyPost(req.params.idPost)
+        // const [[post]] = await pool.query(`SELECT * FROM posts WHERE id = ?`, [id])
+
+        // if(!post){
+        //     throw {
+        //         status: 404,
+        //         message: "Post not found",
+        //         code: "NOT FOUND"
+        //     }
+        // }
+
+        verifyOwner(post, currentUser)
+        
+        const {title = post.title, description = post.description} = req.body;
+
+        const [response] = await pool.query(`UPDATE posts SET title = ?, description = ?
+        WHERE id = ?`, [title, description, post.id])
+
+        return res.status(200).json({
+            ok: true,
+            message: response.changedRows ? "Post updated": "No changes at all",
+            post: {
+                id: post.insertId
+            }
+        })
+
+    } catch (error) {
+        console.log(error)
+        next("El error esta en el PATCH /posts " + error.message)
+    }
+})
+
+//eliminar un post
+app.delete('/posts/:idPost', checkUser, async(req, res, next) => {
+    try {
+
+        const currentUser = req.currentUser;
+
+        const post = await  verifyPost(req.params.idPost)
+
+        verifyOwner(post, currentUser)
+
+        const response = await pool.query(`DELETE FROM posts WHERE id = ?`, [post.id])
+
+        console.log(response)
+
+        return res.status(200).json({
+            ok : true,
+            message : "Publicacion borrada con exito",
+        })
+        
+    } catch (error) {
+        console.log(error)
+        next("El error esta en el DELETE /posts " + error.message)
+    }
+})
+
 
 app.use((error, req, res, next) => {
 
