@@ -9,6 +9,7 @@ import validateCreatePost from './validations/validate-create-post.js';
 import verifyOwner from './validations/verify-owner.js';
 import verifyPost from './validations/verify-post.js';
 import validateCreateComment from './validations/validate-create-comment.js';
+import verifyComment from './validations/verify-comment.js';
 
 
 const app = express();
@@ -257,6 +258,55 @@ app.post('/posts/:idPost/comments', checkUser, async (req, res, next) => {
         next(error.message)
     }
 })
+
+//editar un comentario
+
+app.patch('/posts/:idPost/comments/:idComment', checkUser, async (req, res, next) => {
+    try {
+        const {message} = validateCreateComment(req.body)
+
+        const currentUser = req.currentUser;
+    
+        const comment = await verifyComment(req.params.idComment)
+
+        verifyOwner(comment, currentUser)
+
+        const [response] = await pool.query(`UPDATE comments SET message = ? 
+        WHERE id = ?`, [message, comment.id])
+
+        return res.status(200).json({
+            ok: true,
+            message: response.changedRows ? "Comment updated" : "No changes"
+        })
+
+    } catch (error) {
+        console.log(error)
+        next(error)
+        
+    }
+})
+
+//eliminar un comentario
+app.delete('/posts/:idPost/comments/:idComment', checkUser, async(req, res, next) => {
+    try {
+        const currentUser = req.currentUser
+        const comment = await verifyComment(req.params.idComment)
+        verifyOwner(comment, currentUser)
+        
+        await pool.query(`DELETE FROM comments
+         WHERE id = ?`, [comment.id])
+
+        return res.status(200).json({
+            ok: true,
+            message: "Comment erased"
+        }) 
+
+    } catch (error) {
+        console.log(error)
+        next(error)
+    }
+})
+
 
 app.use((error, req, res, next) => {
 
