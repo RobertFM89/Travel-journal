@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import getPool from './database/get-pool.js';
 import { compare, hash } from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -10,14 +11,22 @@ import verifyOwner from './validations/verify-owner.js';
 import verifyPost from './validations/verify-post.js';
 import validateCreateComment from './validations/validate-create-comment.js';
 import verifyComment from './validations/verify-comment.js';
+import upload from './middlewares/upload.js';
+import crypto from "crypto";
+
+
 
 
 const app = express();
 const PORT = process.env.PORT || 3000
+const PUBLIC_FOLDER = path.join(process.cwd(), "public")
 
 const pool = await getPool();
 
 app.use(express.json());
+
+
+app.use(express.static(PUBLIC_FOLDER))
 
 app.use(parseToken);
 
@@ -121,6 +130,7 @@ app.get('/posts', async (req, res, next) => {
     try {
         const [posts] = await pool.query(`SELECT * FROM posts`)
 
+
         return res.status(200).json({
             ok: true,
             posts
@@ -170,6 +180,72 @@ app.post('/posts',checkUser, async(req, res, next) => {
     } catch (error) {
         console.log(error)
         next("El error esta en el POST /posts" + error.message)
+    }
+})
+
+
+
+app.post('/posts/:idPost/media', checkUser, upload, async (req, res, next) => {
+
+    try {
+        
+        //verificar el post
+        const post = await verifyPost(req.params.idPost)
+
+        //verificar el dueño
+        const currentUser = req.currentUser
+        verifyOwner(post, currentUser)
+
+        //validar la cerga del archivo
+        if(!req.files){
+            throw{
+                status: 400,
+                message: "File not uploaded ",
+                code: "BAD REQUEST"
+            }
+        }
+
+        //recibir la imagen/video
+        const myFile = req.files.media
+
+        //validar si es una imagen o un video
+        if(!myFile.mimetype.startsWith("image") && !myFile.mimetype.startsWith("video")){
+            throw{
+                status: 400,
+                message: "The file is not an image neither a video",
+                code: "BAD REQUEST"
+            }
+        }
+
+         //extraer la extension del archivo
+         const fileExt = path.extname(myFile.name)
+
+         //extraer el mimeType
+         const mimeType = myFile.mimetype
+
+        //generar un nombre aleatorio
+        const fileName = crypto.randomUUID();
+
+        //generar la url que se guardara (post_media)
+        const filePath = path.join('media', fileName + fileExt)
+        const url = `${req.protocol}://${req.get('host')}/${filePath}`
+
+        //guardamos los cambios en la base de datos
+        await pool.query(`INSERT INTO post_media(url, mimeType, postId) 
+        VALUES(?, ?, ?)`, [url, mimeType, post.id])
+
+        //mover el archivo 
+        await myFile.mv(path.join(PUBLIC_FOLDER, filePath))
+        
+        return res.status(201).json({
+            ok: true,
+            message: "File uploaded",
+            url
+        })
+
+    } catch (error) {
+       console.log(error)
+       next(error) 
     }
 })
 
@@ -260,7 +336,6 @@ app.post('/posts/:idPost/comments', checkUser, async (req, res, next) => {
 })
 
 //editar un comentario
-
 app.patch('/posts/:idPost/comments/:idComment', checkUser, async (req, res, next) => {
     try {
         const {message} = validateCreateComment(req.body)
@@ -307,6 +382,64 @@ app.delete('/posts/:idPost/comments/:idComment', checkUser, async(req, res, next
     }
 })
 
+//votar
+app.post('/posts/:idPost/votes/:voteType?', checkUser, async(req, res, next) => {
+
+    try {
+        
+        const currentUser = req.currentUser;
+        const post = await verifyPost(req.params.idPost);
+        const voteType = req.params.voteType || "positive"
+        const voteCurrent = voteType == "negative" ? -1 : 1
+
+        const [[vote]] = await pool.query(`SELECT * FROM votes 
+        WHERE postId = ? AND userId =?`, [post.id, currentUser.id])
+
+        if(vote) {
+            await pool.query(`UPDATE votes SET vote = ? 
+            WHERE id  = ?`,[voteCurrent, vote.id])
+        }else {
+            await pool.query(`INSERT INTO votes (postId, userId, vote) VALUES (?, ?, ?)`, [post.id, currentUser.id, voteCurrent])
+        }
+        return res.status(201).json({
+            ok: true,
+            message: `The vote was  ${vote ? "modified" : "added"}`
+        })
+
+    } catch (error) {
+        console.log(error)
+        next(error)
+    }
+})
+
+//eliminar el voto
+app.delete('/posts/:idPost/votes', checkUser, async(req, res, next) =>{
+
+    try {
+        const currentUser = req.currentUser
+        const post = await verifyPost(req.params.idPost)
+        
+
+        await pool.query(`DELETE FROM votes
+        WHERE postId = ? AND userId = ?`, [post.id, currentUser.id])
+
+        return res.status(200).json({
+            ok: true,
+            message: " The vote was deleted"
+        })
+        
+    } catch (error) {
+        console.log(error)
+        next(error)
+    }
+})
+
+app.use((req, res) => {
+    return res.status(404).json({
+        ok: false,
+        message: "Endpoit not found"
+    })
+})
 
 app.use((error, req, res, next) => {
 

@@ -56,6 +56,7 @@ const createTables = async () => {
         await pool.query(`CREATE TABLE post_media (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             url VARCHAR(255) NOT NULL,
+            mimeType VARCHAR(50) NOT NULL,
             postId INT UNSIGNED NOT NULL,
             createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),

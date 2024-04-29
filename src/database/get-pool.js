@@ -1,11 +1,11 @@
 import {createPool} from 'mysql2/promise.js'
 import {DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE} from '../../env.js'
 
-let pool;
+var pool;
 
 const getPool = async () => {
     try {
-        if(!pool){
+        
             pool = createPool({
                 user : DB_USERNAME,
                 password : DB_PASSWORD,
@@ -23,8 +23,8 @@ const getPool = async () => {
             });
             console.log("Established connection")
             
-        }
-        return pool
+            return pool
+        
 
     } catch (error) {
         console.log(error)
